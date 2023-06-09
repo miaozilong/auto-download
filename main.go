@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	log "github.com/cihub/seelog"
 	"github.com/dablelv/go-huge-util/zip"
 	"net/http"
@@ -24,10 +23,7 @@ func init() {
 	log.Info("项目启动")
 }
 func download(w http.ResponseWriter, r *http.Request) {
-	var body Body
-	var downloadByte []byte
-	json.NewDecoder(r.Body).Decode(&body)
-	url := body.Url
+	url := r.FormValue("url")
 	log.Debug("接收到下载请求", url)
 	projectName := getProjectNameFromUrl(url)
 	nowStr := time.Now().Format("20060102150405")
@@ -47,6 +43,7 @@ func download(w http.ResponseWriter, r *http.Request) {
 	header := w.Header()
 	header.Add("Content-Type", "application/octet-stream")
 	header.Add("Content-Disposition", "attachment;filename="+projectName+".zip")
+	var downloadByte []byte
 	if downloadByte, err = os.ReadFile(zipFilePath); err != nil {
 		log.Info("读取文件失败")
 	}

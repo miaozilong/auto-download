@@ -121,6 +121,7 @@ func AutoDelete(url string) {
 			log.Debug(file)
 			if !file.IsDir() {
 				fileTime := file.ModTime()
+				log.Debug("文件时间：" + fileTime.Format("2006-01-02 15:04:05"))
 				if time.Now().Sub(fileTime) > time.Hour*48 {
 					filePath := filesPath[index]
 					os.Remove(filePath)

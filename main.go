@@ -78,6 +78,7 @@ func downloadReq(w http.ResponseWriter, r *http.Request) {
 			Used:    true,
 			UseTime: time.Now(),
 		}
+		sendMail("消费成功-"+orderId, "订单ID为:"+orderId)
 		resp["filePath"] = zipFilePath
 	}
 	resp["errMsg"] = errMsg

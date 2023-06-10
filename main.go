@@ -115,7 +115,10 @@ func AutoDelete(url string) {
 		panic(err)
 	}
 	if files != nil {
+		log.Debug(files)
 		for index, file := range files {
+			log.Debug(index)
+			log.Debug(file)
 			if !file.IsDir() {
 				fileTime := file.ModTime()
 				if time.Now().Sub(fileTime) > time.Hour*48 {

@@ -112,13 +112,15 @@ func AutoDelete(url string) {
 	if err != nil {
 		panic(err)
 	}
-	for index, file := range files {
-		if !file.IsDir() {
-			fileTime := file.ModTime()
-			if time.Now().Sub(fileTime) > time.Hour*48 {
-				filePath := filesPath[index]
-				os.Remove(filePath)
-				log.Debug("删除了" + filePath + "，文件的修改日期是" + fileTime.Format("2006-01-02 15:04:05"))
+	if files != nil {
+		for index, file := range files {
+			if !file.IsDir() {
+				fileTime := file.ModTime()
+				if time.Now().Sub(fileTime) > time.Hour*48 {
+					filePath := filesPath[index]
+					os.Remove(filePath)
+					log.Debug("删除了" + filePath + "，文件的修改日期是" + fileTime.Format("2006-01-02 15:04:05"))
+				}
 			}
 		}
 	}

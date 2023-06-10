@@ -107,9 +107,11 @@ func AutoDelete(url string) {
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		files = append(files, info)
 		filesPath = append(filesPath, path)
+		log.Debug("添加了路径:" + path)
 		return nil
 	})
 	if err != nil {
+		log.Debug(err)
 		panic(err)
 	}
 	if files != nil {

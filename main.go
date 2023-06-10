@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	log "github.com/cihub/seelog"
 	"github.com/dablelv/go-huge-util/zip"
+	"github.com/jordan-wright/email"
 	"net/http"
+	"net/smtp"
 	os "os"
 	"os/exec"
 	"path/filepath"
@@ -12,9 +14,13 @@ import (
 	"time"
 )
 
-type Body struct {
-	Url string
+type OrderStatus struct {
+	BaobeiId string
+	Used     bool
+	UseTime  time.Time
 }
+
+var order = make(map[string]OrderStatus)
 
 func init() {
 	logger, err := log.LoggerFromConfigAsFile("seelog.xml")
@@ -24,26 +30,57 @@ func init() {
 	_ = log.ReplaceLogger(logger)
 	log.Info("项目启动")
 }
+func addOrder(w http.ResponseWriter, r *http.Request) {
+	orderId := r.FormValue("orderId")
+	baobeiId := r.FormValue("baobeiId")
+	log.Debug("订单ID：" + orderId)
+	log.Debug("宝贝ID：" + baobeiId)
+	order[orderId] = OrderStatus{
+		BaobeiId: baobeiId,
+		Used:     false,
+	}
+	sendMail("充值成功-"+orderId, "订单ID为:"+orderId+",宝贝ID:"+baobeiId)
+	resp := make(map[string]string)
+	resp["success"] = "true"
+	jsonResp, _ := json.Marshal(resp)
+	// 以下两行顺序不能颠倒
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(jsonResp)
+}
 func downloadReq(w http.ResponseWriter, r *http.Request) {
+	var errMsg string
 	url := r.FormValue("url")
 	log.Debug("接收到下载请求", url)
-	projectName := getProjectNameFromUrl(url)
-	nowStr := time.Now().Format("20060102150405")
-	cloneTimePath := "/download/" + nowStr
-	clonePath := cloneTimePath + "/" + projectName
-	cmd := exec.Command("git", "clone", "--depth", "1", url, clonePath)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Info(err)
+	orderId := r.FormValue("orderId")
+	if len(orderId) == 0 || order[orderId] == (OrderStatus{}) {
+		errMsg = "订单号不存在"
+	} else if order[orderId].Used {
+		errMsg = "订单号已于" + order[orderId].UseTime.Format("2006-01-02 15:04:05") + "使用,如有问题,请联系管理员"
 	}
-	s := string(output)
-	log.Info("下载成功，内容为:\n" + s)
-	zipFilePath := cloneTimePath + "/" + projectName + ".zip"
-	_ = zip.Zip(zipFilePath, clonePath)
-	log.Info("压缩成功")
-	// 返回 filePath
 	resp := make(map[string]string)
-	resp["filePath"] = zipFilePath
+	if len(errMsg) == 0 {
+		projectName := getProjectNameFromUrl(url)
+		nowStr := time.Now().Format("20060102150405")
+		cloneTimePath := "/download/" + nowStr
+		clonePath := cloneTimePath + "/" + projectName
+		cmd := exec.Command("git", "clone", "--depth", "1", url, clonePath)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Info(err)
+		}
+		s := string(output)
+		log.Info("下载成功，内容为:\n" + s)
+		zipFilePath := cloneTimePath + "/" + projectName + ".zip"
+		_ = zip.Zip(zipFilePath, clonePath)
+		log.Info("压缩成功")
+		order[orderId] = OrderStatus{
+			Used:    true,
+			UseTime: time.Now(),
+		}
+		resp["filePath"] = zipFilePath
+	}
+	resp["errMsg"] = errMsg
 	jsonResp, _ := json.Marshal(resp)
 	// 以下两行顺序不能颠倒
 	w.Header().Set("Content-Type", "application/json")
@@ -72,9 +109,13 @@ func main() {
 			time.Sleep(time.Hour)
 		}
 	}()
-	http.HandleFunc("/downloadReq", downloadReq)   //设置访问的路由
-	http.HandleFunc("/downloadFile", downloadFile) //设置访问的路由
-	err := http.ListenAndServe(":8081", nil)       //设置监听的端口
+	// 淘宝下单
+	http.HandleFunc("/addOrder", addOrder)
+	// 下载请求
+	http.HandleFunc("/downloadReq", downloadReq)
+	// 下载文件
+	http.HandleFunc("/downloadFile", downloadFile)
+	err := http.ListenAndServe(":8081", nil) //设置监听的端口
 	if err != nil {
 		log.Info("ListenAndServe: ", err)
 	}
@@ -128,5 +169,21 @@ func AutoDelete(url string) {
 				}
 			}
 		}
+	}
+}
+
+func sendMail(subject string, content string) {
+	e := email.NewEmail()
+	e.From = "xianqielu869@163.com"
+	e.To = []string{"mofahezi@gmail.com", "miao.zilong@outlook.com"}
+	e.Subject = subject
+	e.Text = []byte(content)
+	err2 := e.Send("smtp.163.com:25", smtp.PlainAuth("",
+		"xianqielu869@163.com",
+		"QNVZHBJRPFRQWBSI",
+		"smtp.163.com"))
+	if err2 != nil {
+		log.Debug(err2)
+		_ = log.Error("发送失败")
 	}
 }

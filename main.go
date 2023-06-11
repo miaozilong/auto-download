@@ -52,6 +52,7 @@ func downloadReq(w http.ResponseWriter, r *http.Request) {
 	var errMsg string
 	url := r.FormValue("url")
 	log.Debug("接收到下载请求", url)
+	url = strings.ReplaceAll(url, "github.com/", "kgithub.com/")
 	orderId := r.FormValue("orderId")
 	if len(orderId) == 0 || order[orderId] == (OrderStatus{}) {
 		errMsg = "订单号不存在"
